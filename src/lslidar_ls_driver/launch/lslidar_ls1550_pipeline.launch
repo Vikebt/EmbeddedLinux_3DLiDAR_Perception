@@ -1,0 +1,94 @@
+<?xml version="1.0"?>
+<launch>
+    <!--
+        LS3 LiDAR Pipeline System - 完整启动文件
+        架构: C++驱动 → C++管线处理 → Python可视化GUI
+        进程: 1. lslidar_ls_driver_node  (原始驱动)
+              2. lslidar_ls_pipeline_node (实时处理管线)
+              3. sensors_collect_v3.py    (可视化GUI)
+    -->
+
+    <!-- ==================== LiDAR参数 ==================== -->
+    <arg name="device_ip" default="192.168.1.200"/>
+    <arg name="msop_port" default="2368"/>
+    <arg name="difop_port" default="2369"/>
+    <arg name="use_time_service" default="false"/>
+    <arg name="packet_rate" default="22440.0"/>
+
+    <!-- ==================== 串口参数 ==================== -->
+    <arg name="gps_port" default="/dev/wheeltec_gps"/>
+    <arg name="gps_baud_rate" default="9600"/>
+    <arg name="imu_port" default="/dev/wheeltec_IMU"/>
+    <arg name="imu_baud_rate" default="460800"/>
+
+    <!-- ==================== 相机参数 ==================== -->
+    <arg name="camera_index" default="0"/>
+    <arg name="camera_width" default="2048"/>
+    <arg name="camera_height" default="1536"/>
+
+    <!-- ==================== 数据保存 ==================== -->
+    <arg name="save_path" default="/home/nuaa/Ayra/data_lidargpsimu/"/>
+
+    <!-- ==================== 调试开关 ==================== -->
+    <arg name="start_rviz" default="false"/>
+    <arg name="debug" default="false"/>
+
+    <!-- ================================================================== -->
+    <!-- 进程1: 雷达驱动 (C++)                                              -->
+    <!-- 功能: UDP接收 → 点云解析 → 发布 /lslidar_point_cloud               -->
+    <!-- ================================================================== -->
+    <node pkg="lslidar_ls_driver" type="lslidar_ls_driver_node"
+          name="lslidar_ls_driver_node" output="screen">
+        <param name="packet_rate" value="$(arg packet_rate)"/>
+        <param name="lidar_ip" value="$(arg device_ip)"/>
+        <param name="msop_port" value="$(arg msop_port)"/>
+        <param name="difop_port" value="$(arg difop_port)"/>
+        <param name="add_multicast" value="false"/>
+        <param name="group_ip" value="224.1.1.2"/>
+        <param name="min_range" value="0.5"/>
+        <param name="max_range" value="300"/>
+        <param name="scan_start_angle" value="-60"/>
+        <param name="scan_end_angle" value="60"/>
+        <param name="frame_id" value="laser_link"/>
+        <param name="pointcloud_topic" value="lslidar_point_cloud"/>
+        <param name="packet_loss" value="true"/>
+        <param name="use_time_service" value="$(arg use_time_service)"/>
+        <param name="pcap" value="$(arg pcap)" if="$(eval pcap != '')"/>
+    </node>
+
+    <!-- ================================================================== -->
+    <!-- 进程2: 点云处理管线 (C++) - 新增!                                 -->
+    <!-- 功能: 订阅原始点云 → 滤波 → 地面分割 → 聚类 → 着陆区检测         -->
+    <!-- 发布: /processed_point_cloud  /obstacle_markers  /landing_zone     -->
+    <!-- ================================================================== -->
+    <node pkg="lslidar_ls_driver" type="lslidar_ls_pipeline_node"
+          name="lslidar_ls_pipeline_node" output="screen">
+        <param name="input_topic" value="lslidar_point_cloud"/>
+        <!-- 调试日志 -->
+        <param name="debug" value="$(arg debug)"/>
+    </node>
+
+    <!-- ================================================================== -->
+    <!-- 进程3: 可视化GUI (Python) - 简化版!                                -->
+    <!-- 功能: 订阅处理结果 → 3D显示 + IMU/GPS/相机 + 数据保存              -->
+    <!-- ================================================================== -->
+    <node name="sensors_collect_v3" pkg="lslidar_ls_driver"
+          type="sensors_collect_v3.py" output="screen" required="false">
+        <param name="camera_index" value="$(arg camera_index)"/>
+        <param name="camera_width" value="$(arg camera_width)"/>
+        <param name="camera_height" value="$(arg camera_height)"/>
+        <param name="gps_port" value="$(arg gps_port)"/>
+        <param name="gps_baud_rate" value="$(arg gps_baud_rate)"/>
+        <param name="imu_port" value="$(arg imu_port)"/>
+        <param name="imu_baud_rate" value="$(arg imu_baud_rate)"/>
+        <param name="save_path" value="$(arg save_path)"/>
+    </node>
+
+    <!-- ================================================================== -->
+    <!-- RViz (可选)                                                        -->
+    <!-- ================================================================== -->
+    <node name="rviz" pkg="rviz" type="rviz"
+          args="-d $(find lslidar_ls_driver)/rviz/lslidar_ls.rviz"
+          output="screen" if="$(arg start_rviz)"/>
+
+</launch>

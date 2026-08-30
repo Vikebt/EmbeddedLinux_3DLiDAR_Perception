@@ -1,0 +1,65 @@
+# 多传感器采集系统配置文件
+# 可以通过修改此文件来调整系统参数
+
+# 雷达参数
+lidar:
+  device_ip: "192.168.1.200"      # 雷达IP地址
+  msop_port: 2368                 # 雷达数据端口
+  difop_port: 2369                # 雷达设备端口
+  use_time_service: false         # 是否使用授时服务
+  packet_rate: 22440.0            # 每秒包数
+  min_range: 0.5                  # 最小探测距离(m)
+  max_range: 300                  # 最大探测距离(m)
+  scan_start_angle: -60           # 最小探测角度(度)
+  scan_end_angle: 60              # 最大探测角度(度)
+  frame_id: "laser_link"          # 点云帧ID
+  pointcloud_topic: "lslidar_point_cloud"  # 点云话题名称
+
+# 相机参数
+camera:
+  index: 0                        # 相机设备索引
+  width: 2048                     # 图像宽度
+  height: 1536                    # 图像高度
+  fps: 20                         # 目标帧率
+
+# GPS参数
+gps:
+  port: "/dev/wheeltec_gps"       # GPS串口设备
+  baud_rate: 9600                 # GPS波特率
+
+# IMU参数
+imu:
+  port: "/dev/wheeltec_IMU"       # IMU串口设备
+  baud_rate: 460800               # IMU波特率
+
+# 数据保存参数
+data_save:
+  base_path: "/home/nuaa/Ayra/data_lidargpsimu/"  # 数据保存基础路径
+  create_timestamp_folder: true   # 是否创建时间戳文件夹
+
+# 算法参数
+algorithms:
+  obstacle_detection:
+    enabled: false                # 是否启用障碍物检测
+    downsample_factor: 5          # 点云下采样因子
+  
+  landing_zone_detection:
+    enabled: false                # 是否启用着陆区检测
+    processing_interval: 10       # 处理间隔(帧数)
+
+# 显示参数
+display:
+  point_cloud:
+    downsample_factor: 5          # 显示用点云下采样因子
+    color_by_height: true         # 是否按高度着色
+    colormap: "viridis"           # 颜色映射
+  
+  camera:
+    show_roi_box: true            # 是否显示感兴趣区域框
+    roi_box_color: [0, 0, 255]    # ROI框颜色(BGR)
+
+# 日志参数
+logging:
+  level: "INFO"                   # 日志级别: DEBUG, INFO, WARN, ERROR
+  save_to_file: false             # 是否保存日志到文件
+  log_file_path: "/tmp/sensors_collect_v3.log"  # 日志文件路径

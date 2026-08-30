@@ -1,0 +1,4 @@
+<launch>
+    <node name="test_pipeline_node" pkg="lslidar_ls_driver"
+          type="test_pipeline" output="screen" />
+</launch>

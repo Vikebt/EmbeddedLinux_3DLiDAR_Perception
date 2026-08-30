@@ -1,0 +1,19 @@
+version: '3.8'
+
+services:
+  ls3lidar:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    network_mode: "host"
+    privileged: true
+    environment:
+      - ROS_MASTER_URI=http://localhost:11311
+      - ROS_IP=127.0.0.1
+    volumes:
+      - ../config:/catkin_ws/src/lslidar_ls_driver/config
+      - ../launch:/catkin_ws/src/lslidar_ls_driver/launch
+      - /dev:/dev:ro
+    command: >
+      bash -c "source /catkin_ws/devel/setup.bash &&
+               roslaunch lslidar_ls_driver lslidar_ls1550_enhanced.launch"

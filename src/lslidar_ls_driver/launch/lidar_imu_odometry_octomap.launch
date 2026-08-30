@@ -1,0 +1,62 @@
+<launch>
+    <!-- 你的LiDAR-IMU里程计节点 -->
+    <node pkg="lslidar_ls_driver" type="lidar_imu_odometry_octomap_node.py" name="lidar_imu_odometry_octomap_node" output="screen">
+        <param name="base_data_path" value="/home/nuaa/Ayra/data_lidargpsimu/20250417_104836"/>
+        <param name="odom_frame_id" value="odom_drone"/> <!-- 世界/里程计坐标系 -->
+        <param name="lidar_frame_id" value="lidar_link"/> <!-- 你里程计输出的位姿是这个frame的 -->
+        
+        <param name="voxel_size_scan_for_odometry" value="0.2"/>
+        <param name="voxel_size_scan_for_octomap" value="0.1"/> <!-- Octomap用更密的点云 -->
+        <param name="voxel_size_map_history_for_odometry" value="0.4"/>
+        <param name="n_map_frames_for_odometry" value="8"/>
+
+        <param name="icp_max_correspondence_distance" value="1.0"/>
+        <param name="icp_max_iterations" value="15"/>
+        <param name="min_icp_fitness" value="0.1"/>
+        <param name="processing_rate" value="10.0"/>
+
+        <rosparam param="T_imu_lidar">
+            # T_imu_lidar: p_I = T_imu_lidar @ p_L
+            # (LiDAR系到IMU系的变换，如果IMU是无人机主体参考，那这就是LiDAR相对于无人机主体的位姿的逆的某种形式)
+            # 或者更直接地，如果你的里程计输出 T_W_Lidar, 并且lidar_frame_id就是LiDAR的frame
+            # 这个T_imu_lidar 主要用于IMU预测部分。
+            - [-0.01325259,  0.99988831, -0.00690810, -0.19803817]
+            - [-0.99962256, -0.01308217,  0.02415800,  0.02344096]
+            - [ 0.02406492,  0.00722565,  0.99968428, -0.07190712]
+            - [ 0.0,         0.0,         0.0,         1.0       ]
+        </rosparam>
+
+        <!-- 重映射发布的点云话题名，如果需要 -->
+        <remap from="~world_scan_for_octomap" to="/octomap_point_cloud_world"/>
+    </node>
+
+    <!-- OctoMap Server Node -->
+    <node pkg="octomap_server" type="octomap_server_node" name="octomap_server">
+        <!-- OctoMap分辨率 (米) -->
+        <param name="resolution" value="2" />
+
+        <!-- 世界坐标系名 (必须与你的里程计发布的odom_frame_id一致) -->
+        <param name="frame_id" value="odom_drone" />
+        
+        <!-- 传感器模型参数 (根据你的LiDAR调整) -->
+        <param name="sensor_model/max_range" value="500.0" /> <!-- LiDAR的最大有效测距 -->
+        <param name="sensor_model/hit" value="0.7" />
+        <param name="sensor_model/miss" value="0.4" />
+        <param name="sensor_model/min" value="0.12" />
+        <param name="sensor_model/max" value="0.97" />
+        
+        <!-- 输入的点云话题 (订阅你的里程计节点发布的在世界坐标系下的点云) -->
+        <remap from="cloud_in" to="/octomap_point_cloud_world" />
+
+        <!-- 其他OctoMap参数，如占据阈值、滤波等 -->
+        <param name="occupancy_thres" value="0.65" /> <!-- 更高表示更确信是障碍物 -->
+        <param name="prob_hit" value="0.85" />
+        <param name="prob_miss" value="0.3" />
+        <param name="latch" value="false"/> <!-- 是否锁存地图 -->
+        <param name="filter_ground" value="false"/> <!-- 通常由你的节点处理或Octomap自己有地面滤波选项 -->
+    </node>
+
+    <!-- RViz (可选) drone_octomap.rviz-->
+    <node type="rviz" name="rviz" pkg="rviz" args="-d $(find lslidar_ls_driver)/rviz/drone_octomap.rviz" if="true"/>
+
+</launch>

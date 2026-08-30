@@ -1,0 +1,76 @@
+<?xml version="1.0"?>
+<launch>
+    <!--
+        LS3 LiDAR Enhanced Driver - 启动文件
+        集成多级Pipeline + 实时感知 + 资源监控
+    -->
+
+    <!-- ==================== 参数 ==================== -->
+    <arg name="device_ip" default="192.168.1.200"/>
+    <arg name="msop_port" default="2368"/>
+    <arg name="difop_port" default="2369"/>
+    <arg name="use_time_service" default="false"/>
+    <arg name="packet_rate" default="22440.0"/>
+
+    <!-- Pipeline配置参数 -->
+    <arg name="enable_enhanced" default="true"/>
+    <arg name="config_file" default="$(find lslidar_ls_driver)/config/pipeline_config.yaml"/>
+
+    <!-- ==================== 加载配置参数 ==================== -->
+    <rosparam command="load" file="$(arg config_file)" unless="$(eval config_file == '')"/>
+
+    <!-- ==================== 增强版驱动节点 ==================== -->
+    <group if="$(arg enable_enhanced)">
+        <node pkg="lslidar_ls_driver" type="lslidar_ls_driver_enhanced_node"
+              name="lslidar_ls_driver_enhanced_node" output="screen">
+
+            <!-- LiDAR基础参数 -->
+            <param name="packet_rate" value="$(arg packet_rate)"/>
+            <param name="lidar_ip" value="$(arg device_ip)"/>
+            <param name="msop_port" value="$(arg msop_port)"/>
+            <param name="difop_port" value="$(arg difop_port)"/>
+            <param name="add_multicast" value="false"/>
+            <param name="group_ip" value="224.1.1.2"/>
+            <param name="min_range" value="0.5"/>
+            <param name="max_range" value="300"/>
+            <param name="scan_start_angle" value="-60"/>
+            <param name="scan_end_angle" value="60"/>
+            <param name="frame_id" value="laser_link"/>
+            <param name="pointcloud_topic" value="lslidar_point_cloud"/>
+            <param name="packet_loss" value="true"/>
+            <param name="use_time_service" value="$(arg use_time_service)"/>
+
+            <!-- Pipeline参数 (从yaml加载) -->
+            <param name="~voxel_leaf_size" value="0.15"/>
+            <param name="~cluster_tolerance" value="0.5"/>
+            <param name="~enable_obstacle_detection" value="true"/>
+        </node>
+    </group>
+
+    <!-- ==================== 基础版驱动节点（备用） ==================== -->
+    <group unless="$(arg enable_enhanced)">
+        <node pkg="lslidar_ls_driver" type="lslidar_ls_driver_node"
+              name="lslidar_ls_driver_node" output="screen">
+            <param name="packet_rate" value="$(arg packet_rate)"/>
+            <param name="lidar_ip" value="$(arg device_ip)"/>
+            <param name="msop_port" value="$(arg msop_port)"/>
+            <param name="difop_port" value="$(arg difop_port)"/>
+            <param name="min_range" value="0.5"/>
+            <param name="max_range" value="300"/>
+            <param name="frame_id" value="laser_link"/>
+            <param name="pointcloud_topic" value="lslidar_point_cloud"/>
+            <param name="packet_loss" value="true"/>
+            <param name="use_time_service" value="$(arg use_time_service)"/>
+        </node>
+    </group>
+
+    <!-- ==================== RViz可视化 ==================== -->
+    <node name="rviz" pkg="rviz" type="rviz"
+          args="-d $(find lslidar_ls_driver)/rviz/lslidar_ls.rviz" output="screen"/>
+
+    <!-- ==================== Python感知节点（可选） ==================== -->
+    <!--
+    <node pkg="lslidar_ls_driver" type="obstacle_recog.py"
+          name="obstacle_recognition" output="screen"/>
+    -->
+</launch>

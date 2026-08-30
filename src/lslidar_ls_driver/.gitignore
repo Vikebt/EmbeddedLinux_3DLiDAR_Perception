@@ -1,0 +1,15 @@
+# 编译输出
+build/
+*.o
+*.so
+*.a
+
+# Python缓存
+__pycache__/
+*.pyc
+
+# 临时文件
+*.bak
+*.backup
+*~
+temp/

@@ -1,0 +1,71 @@
+# =============================================================================
+# ls3lidar.service — LS3 LiDAR 多传感器采集系统 systemd 服务
+#
+# 安装:
+#   sudo cp ls3lidar.service /etc/systemd/system/
+#   sudo systemctl daemon-reload
+#   sudo systemctl enable ls3lidar    # 开机自启
+#
+# 管理:
+#   sudo systemctl start ls3lidar     # 启动
+#   sudo systemctl stop ls3lidar      # 停止
+#   sudo systemctl restart ls3lidar   # 重启
+#   sudo systemctl status ls3lidar    # 查看状态
+#   journalctl -u ls3lidar -f         # 查看实时日志
+#
+# 配置:
+#   编辑 /etc/default/ls3lidar 设置环境变量:
+#     LS3_WS_PATH=/home/nuaa/Ayra/LS3lidar_ws
+#     LS3_LIDAR_IP=192.168.1.200
+#     LS3_SAVE_PATH=/mnt/data/lidar/
+#
+# 作者: 周聪
+# 日期: 2025
+# =============================================================================
+
+[Unit]
+Description=LS3 LiDAR Multi-Sensor Data Collection System
+Documentation=https://github.com/your-repo/ls3lidar
+After=network.target network-online.target
+Wants=network-online.target
+
+[Service]
+# 运行类型: 简单(前台进程)
+Type=simple
+
+# 工作目录
+WorkingDirectory=/home/nuaa/Ayra/LS3lidar_ws
+
+# 启动命令 (使用 --no-gui 后台模式)
+ExecStart=/home/nuaa/Ayra/LS3lidar_ws/src/lslidar_ls_driver/scripts/run_sensors_collect_v3.sh --no-gui
+
+# 重启策略: 总是自动重启
+Restart=always
+RestartSec=5
+
+# 资源限制
+LimitNOFILE=65536           # 最大文件描述符 (UDP socket + 文件)
+LimitNPROC=512              # 最大进程数
+LimitRTPRIO=50              # 实时优先级上限
+LimitRTTIME=1000000         # 实时时间上限 (us)
+
+# CPU和内存资源
+CPUAffinity=2-3             # CPU亲和性 (多核系统绑定到核心2-3)
+MemoryMax=2G                # 最大内存限制
+MemoryHigh=1.5G             # 内存高水位警告
+
+# 日志
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=ls3lidar
+
+# 安全
+ProtectHome=false
+ReadWritePaths=/home/nuaa/Ayra/data_lidargpsimu/
+
+# 用户 (建议使用非root用户)
+User=nuaa
+Group=nuaa
+
+[Install]
+WantedBy=multi-user.target

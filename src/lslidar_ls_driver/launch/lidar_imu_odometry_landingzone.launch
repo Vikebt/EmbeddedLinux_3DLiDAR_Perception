@@ -1,0 +1,74 @@
+<launch>
+    <node pkg="lslidar_ls_driver" type="lidar_imu_odometry_landingzone_node.py" name="lidar_imu_odometry_node" output="screen">
+        <!-- 基本路径参数 -->
+        <!-- <param name="base_data_path" value="/home/nuaa/Ayra/data_lidargpsimu/20250417_104836"/> -->
+        <param name="base_data_path" value="/home/nuaa/Downloads/data_20250417"/>
+        <param name="pointcloud_dir_name" value="pointcloud"/>
+        <param name="sensors_dir_name" value="sensors"/>
+
+        <!-- 坐标系 -->
+        <param name="odom_frame_id" value="odom"/>
+        <param name="lidar_frame_id" value="lidar_link"/>
+
+        <!-- 地图和处理参数 -->
+        <param name="n_map_frames" value="1"/>
+        <param name="local_map_crop_radius_for_processing" value="200.0"/> <!-- 半径200米内的局部地图会被处理 -->
+        <param name="colormap_name_global_map" value="jet"/> <!-- "jet", "viridis", or "" for no color -->
+
+        <!-- 体素大小 -->
+        <param name="voxel_size_map_history" value="0.25"/>
+        <param name="voxel_size_scan" value="0.1"/>
+
+        <!-- ICP -->
+        <param name="icp_max_correspondence_distance" value="0.8"/>
+        <param name="icp_max_iterations" value="10"/>
+        <param name="min_icp_fitness" value="0.1"/>
+        <param name="deICP" value="Ture"/>
+        
+        
+        <!-- 处理速率 -->
+        <param name="processing_rate" value="10.0"/> <!-- 根据数据量和计算能力调整 -->
+
+        <!-- 地面分割 -->
+        <param name="ground_seg_distance_threshold" value="0.8"/>
+        <param name="ground_seg_ransac_n" value="3"/>
+        <param name="ground_seg_num_iterations" value="100"/>
+
+        <!-- 非地面聚类 -->
+        <param name="nonground_cluster_eps" value="2"/>
+        <param name="nonground_cluster_min_points_dbscan" value="15"/>
+        <param name="nonground_cluster_min_points_for_vis" value="20"/>
+
+        <!-- T_imu_lidar (LiDAR到IMU的变换) -->
+        <rosparam param="T_imu_lidar">
+            [[-0.01325259,  0.99988831, -0.0069081,  -0.19803817],
+             [-0.99962256, -0.01308217,  0.024158,    0.02344096],
+             [ 0.02406492,  0.00722565,  0.99968428, -0.07190712],
+             [ 0.0,          0.0,           0.0,          1.0]]
+        </rosparam>
+
+        <!-- 目标识别相关 -->
+        <param name="enable_basic_object_recognition" value="True"/>
+        <!-- <param name="vehicle_like_min_dim" value=" [1.5, 0.8, 0.8]"/> -->
+        <!-- <param name="vehicle_like_max_dim" value=" [7.0, 3.0, 3.0]"/>    -->
+        <param name="vehicle_like_min_points" value="50"/>  
+
+        <!-- <param name="small_object_max_dim" value=" [1.0, 1.0, 1.5]"/>    -->
+        <param name="small_object_min_points" value="10"/>   
+
+        <!-- 新增: 着陆区检测参数 -->
+        <param name="landing/grid_resolution" value="1" />        <!-- 栅格大小 (米) -->
+        <param name="landing/zone_radius" value="3" />            <!-- 期望的着陆区半径 (米) -->
+        <param name="landing/max_cell_std_dev" value="0.08" />       <!-- 单元格内最大高度标准差 -->
+        <param name="landing/max_cell_range" value="0.15" />        <!-- 单元格内最大高度差 -->
+        <param name="landing/max_zone_planarity_std_dev" value="0.10" /> <!-- 整个着陆区平面度 -->
+        <param name="landing/min_points_per_cell" value="5" />         <!-- 单元格最少点数 -->
+
+    </node>
+
+    <!-- 启动 RViz 可视化 (可选) -->
+    <node  name="rviz" pkg="rviz" type="rviz" args="-d $(find lslidar_ls_driver)/rviz/odometry_map_landingzone.rviz" if="true"/>
+</launch>
+
+
+

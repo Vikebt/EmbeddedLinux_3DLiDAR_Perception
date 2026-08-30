@@ -1,0 +1,11 @@
+# catkin generated artifacts
+/build/
+/devel/
+/install/
+/logs/
+
+# IDE and local runtime output
+/.vscode/
+*.user
+*.swp
+/data/

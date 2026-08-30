@@ -1,0 +1,98 @@
+<launch>
+    <!-- ===================================================================================== -->
+    <!--          实时激光雷达-IMU里程计与安全着陆区检测系统 - 启动文件          -->
+    <!--                                                                                       -->
+    <!--  作用:                                                                                -->
+    <!--    1. 设置系统所需的所有参数。                                                        -->
+    <!--    2. 启动集成了数据采集、处理和GUI的核心Python节点。                                 -->
+    <!--    3. (可选) 启动RViz进行额外的调试可视化。                                           -->
+    <!-- ===================================================================================== -->
+
+    <!-- ============================= 参数定义 (Argument Definitions) ============================= -->
+    <!-- 定义一个参数，用于决定是否启动RViz。默认为true。 -->
+    <!-- 使用方法: roslaunch your_package realtime_perception_system.launch rviz:=false -->
+    <arg name="rviz" default="true" />
+
+
+    <!-- ============================= 核心感知节点 (Core Perception Node) ============================= -->
+    <!--
+      启动我们融合后的主Python脚本。
+      - 'pkg': 替换成您的ROS包名。
+      - 'type': 您的Python脚本文件名。
+      - 'name': 节点在ROS网络中的名字。
+      - 'output="screen"': 将节点的打印信息(print/logging)输出到终端，方便调试。
+    -->
+    <node pkg="lslidar_ls_driver" type="sensors_collect_odomtry_landing_v3.py" name="realtime_perception_system_node" output="screen">
+
+        <!-- ============== 1. 数据采集与保存配置 ============== -->
+        <!-- 数据保存的基础路径 -->
+        <param name="~save_path" type="string" value="/home/nuaa/Ayra/data_lidargpsimu/" />
+        <!-- 相机设备索引号 (例如 /dev/video0 对应 0) -->
+        <param name="~camera_index" type="int" value="0" />
+        <!-- 相机分辨率 -->
+        <param name="~camera_width" type="int" value="1920" />
+        <param name="~camera_height" type="int" value="1080" />
+        <!-- 串口设备配置 -->
+        <param name="~gps_port" type="string" value="/dev/wheeltec_gps" />
+        <param name="~gps_baud_rate" type="int" value="9600" />
+        <param name="~imu_port" type="string" value="/dev/wheeltec_IMU" />
+        <param name="~imu_baud_rate" type="int" value="460800" />
+
+        <!-- ============== 2. 后端处理配置 - 里程计与地图 ============== -->
+        <!-- 定义坐标系名称 -->
+        <param name="~odom_frame_id" type="string" value="odom" />
+        <param name="~lidar_frame_id" type="string" value="laser_link" />
+        <!-- IMU到LiDAR的变换矩阵 (外参)。这是一个4x4的齐次变换矩阵，以行主序的列表形式表示。-->
+        <!-- 请务必用您自己标定得到的精确值替换这里的示例值。 -->
+        <rosparam param="~T_imu_lidar" subst_value="true">
+            [
+              [-0.01325259, 0.99988831, -0.0069081, -0.19803817],
+              [-0.99962256, -0.01308217, 0.024158,  0.02344096],
+              [0.02406492,  0.00722565, 0.99968428, -0.07190712],
+              [0.0, 0.0, 0.0, 1.0]
+            ]
+        </rosparam>
+        <!-- 用于构建局部地图的历史帧数 -->
+        <param name="~n_map_frames" type="int" value="1" />
+        <!-- 体素下采样网格大小 (米)。值越小，点云越密集，计算量越大。 -->
+        <param name="~voxel_size_scan" type="double" value="0.15" />
+        <param name="~voxel_size_map_history" type="double" value="0.25" />
+
+        <!-- ============== 3. 后端处理配置 - 感知算法 ============== -->
+        <!-- 局部地图处理半径 (米) -->
+        <param name="~local_map_crop_radius" type="double" value="500.0" />
+        <!-- 是否启用关键的地面校正步骤 -->
+        <param name="~enable_ground_alignment" type="bool" value="true" />
+        <!-- RANSAC地面分割距离阈值 (米) -->
+        <param name="~ground_seg_dist_thresh" type="double" value="0.25" />
+        <!-- DBSCAN障碍物聚类参数 -->
+        <param name="~nonground_cluster_eps" type="double" value="0.7" />
+        <param name="~nonground_cluster_min_points" type="int" value="25" />
+
+        <!-- ============== 4. 后端处理配置 - 着陆区检测 ============== -->
+        <!-- 栅格地图分辨率 (米/格) -->
+        <param name="~landing/grid_resolution" type="double" value="0.5" />
+        <!-- 期望的着陆区半径 (米) -->
+        <param name="~landing/zone_radius" type="double" value="2.0" />
+        <!-- 平坦度阈值 -->
+        <param name="~landing/max_cell_std_dev" type="double" value="0.08" />
+        <param name="~landing/max_cell_range" type="double" value="0.15" />
+        <param name="~landing/max_zone_planarity_std_dev" type="double" value="0.10" />
+        <!-- 栅格有效性阈值 -->
+        <param name="~landing/min_points_per_cell" type="int" value="10" />
+
+    </node>
+
+
+    <!-- ============================= 可选: RViz 可视化 ============================= -->
+    <!--
+      如果 'rviz' 参数为 true (默认)，则启动RViz。
+      - 'if="$(arg rviz)"': 条件启动指令。
+      - 'args="-d $(find lslidar_ls_driver)/rviz/perception_config.rviz"':
+        加载一个预先配置好的RViz文件。强烈建议您创建一个.rviz文件，
+        在其中添加好需要订阅的话题（如处理后的点云、路径、着陆区Marker等），
+        这样每次启动RViz时就无需手动配置了。
+    -->
+    <node type="rviz" name="rviz" pkg="rviz" args="-d $(find lslidar_ls_driver)/rviz/qt_odometry_map_landingzone.rviz" if="$(arg rviz)" />
+
+</launch>

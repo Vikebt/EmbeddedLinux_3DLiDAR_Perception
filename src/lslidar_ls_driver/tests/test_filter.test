@@ -1,0 +1,4 @@
+<launch>
+    <node name="test_filter_node" pkg="lslidar_ls_driver"
+          type="test_filter" output="screen" />
+</launch>

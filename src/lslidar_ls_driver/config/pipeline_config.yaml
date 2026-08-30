@@ -1,0 +1,93 @@
+# =============================================================================
+# LS3 LiDAR Enhanced Driver - 流水线配置文件
+#
+# 该文件定义了多级处理管线的所有参数，无需重新编译即可调整算法行为。
+# 通过ROS参数服务器加载: rosparam load config/pipeline_config.yaml
+#
+# 作者: 周聪
+# 日期: 2025
+# =============================================================================
+
+# ==================== 1. 通用配置 ====================
+general:
+  frame_id: "laser_link"
+  use_time_service: false          # 是否使用授时
+  time_service_mode: "gps"         # gps / ptp_l2 / ptp_udpv4 / ntp
+  packet_loss_detection: true      # 丢包检测
+
+# ==================== 2. 数据捕获配置 ====================
+capture:
+  lidar_ip: "192.168.1.200"       # 雷达IP
+  msop_port: 2368                  # 数据端口
+  difop_port: 2369                 # 设备端口
+  add_multicast: false             # 组播
+  group_ip: "224.1.1.2"           # 组播地址
+  packet_rate: 22440.0             # 每秒包数(离线pcap用)
+  use_jumbo_frame: false           # Jumbo Frame (9000字节)
+
+# ==================== 3. Pipeline 流水线配置 ====================
+pipeline:
+  # 各级队列大小
+  queue_sizes:
+    prefiler: 32
+    perception: 16
+    visualization: 8
+
+# ==================== 4. 点云滤波参数 ====================
+filter:
+  # 体素下采样
+  enable_voxel_grid: true
+  voxel_leaf_size: 0.15            # 体素大小(m)，嵌入式可设0.2-0.3
+
+  # 统计离群点移除
+  enable_statistical_outlier: true
+  sor_mean_k: 20                   # 邻近点数
+  sor_std_dev_thresh: 1.0          # 标准差倍数
+
+  # 半径滤波
+  enable_radius_filter: false
+  radius_search: 0.5
+  radius_min_neighbors: 6
+
+  # 距离裁剪
+  range_min: 0.5                   # 最小距离(m)
+  range_max: 200.0                 # 最大距离(m)
+
+  # 高度裁剪
+  enable_height_filter: true
+  height_min: -2.0
+  height_max: 10.0
+
+  # ROI裁剪
+  enable_crop_box: false
+  crop:
+    min_x: -50.0
+    max_x: 50.0
+    min_y: -50.0
+    max_y: 50.0
+    min_z: -5.0
+    max_z: 20.0
+
+# ==================== 5. 地面分割参数 ====================
+ground_segmentation:
+  distance_threshold: 0.25         # RANSAC距离阈值(m)
+  max_iterations: 100              # 最大迭代次数
+  ground_normal_z_min: 0.7         # 地面法向量Z分量最小值
+  enable_multi_plane: false        # 多平面分割
+  max_planes: 3
+  enable_slope_adaptation: true    # 坡度适应
+  max_slope_angle_deg: 15.0        # 最大坡度(度)
+
+# ==================== 6. 聚类参数 ====================
+clustering:
+  cluster_tolerance: 0.5           # 聚类半径(m)
+  min_cluster_size: 20             # 最小聚类点数
+  max_cluster_size: 25000          # 最大聚类点数
+
+# ==================== 7. 监控配置 ====================
+monitoring:
+  enable_resource_monitor: true
+  resource_sample_interval: 0.5    # 资源采样间隔(秒)
+  enable_perf_profiler: true
+  profiler_max_samples: 10000
+  diagnostic_interval: 10.0        # 诊断打印间隔(秒)
