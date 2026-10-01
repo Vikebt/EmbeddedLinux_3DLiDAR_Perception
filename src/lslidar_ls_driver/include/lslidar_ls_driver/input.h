@@ -39,7 +39,6 @@
 #include <sstream>
 #include <sys/socket.h>
 #include <arpa/inet.h>
-#include <poll.h>
 #include <sys/epoll.h>
 #include <cerrno>
 #include <fcntl.h>
@@ -102,7 +101,7 @@ namespace lslidar_ch_driver {
 
     private:
         int sockfd_;
-        int efd;
+        int efd_;
         in_addr devip_;
         //struct ip_mreq group;
 

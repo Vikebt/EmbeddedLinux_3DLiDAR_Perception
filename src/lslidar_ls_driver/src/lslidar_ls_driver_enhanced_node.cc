@@ -10,11 +10,11 @@
 #include <lslidar_ls_driver/driver/lslidar_ls_driver_enhanced.h>
 #include <csignal>
 
-volatile sig_atomic_t g_flag = 1;
+volatile sig_atomic_t flag = 1;
 
 static void signalHandler(int sig) {
     if (sig == SIGINT || sig == SIGTERM) {
-        g_flag = 0;
+        flag = 0;
     }
 }
 

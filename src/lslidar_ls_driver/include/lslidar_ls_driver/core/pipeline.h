@@ -19,7 +19,7 @@
  *
  * 关键设计:
  *   - 线程安全队列: mutex + condition_variable 实现生产者-消费者模型
- *   - 背压控制: 队列满时生产者自动阻塞，防止内存溢出
+ *   - 过载控制: 实时链路队列满时丢弃最旧帧并记录计数
  *   - 性能追踪: 每个Stage自动统计处理耗时
  *
  * 作者: 周聪
@@ -43,6 +43,7 @@
 #include <pcl/point_cloud.h>
 #include <pcl/point_types.h>
 #include <ros/ros.h>
+#include <lslidar_ls_driver/core/bounded_queue.h>
 
 namespace lslidar_ch_driver {
 
@@ -58,7 +59,7 @@ namespace lslidar_ch_driver {
 // 关键特性:
 //   1. 线程安全: 用 mutex + condition_variable 保护队列操作
 //   2. 有界队列: max_size_ 限制队列长度，防止内存溢出
-//   3. 背压控制: 队列满时 push() 会阻塞等待，直到消费者取走数据
+//   3. 过载策略: Pipeline 使用 DropOldest 保持采集端有界延迟
 //   4. 优雅关闭: shutdown() 唤醒所有等待线程
 //
 // 类比:
@@ -66,83 +67,7 @@ namespace lslidar_ch_driver {
 //   传送带长度固定（max_size），满了前端就停下来等。
 // ============================================================================
 template<typename T>
-class ThreadSafeQueue {
-public:
-    explicit ThreadSafeQueue(size_t max_size = 64)
-        : max_size_(max_size), shutdown_(false) {}
-
-    /**
-     * push — 生产者放入数据
-     *
-     * 如果队列已满，当前线程会阻塞在这里等待
-     * 直到消费者 pop() 腾出空间
-     */
-    bool push(T item) {
-        std::unique_lock<std::mutex> lock(mutex_);
-        // wait() 会释放锁并让线程休眠，直到条件满足
-        // 条件: 队列未满 或 已关闭
-        not_full_.wait(lock, [this]() {
-            return queue_.size() < max_size_ || shutdown_;
-        });
-        if (shutdown_) return false;
-        queue_.push(std::move(item));
-        not_empty_.notify_one();  // 唤醒一个等待的消费者
-        return true;
-    }
-
-    /**
-     * pop — 消费者取出数据
-     *
-     * 如果队列为空，当前线程会阻塞在这里等待
-     * 直到生产者 push() 放入新数据
-     *
-     * @param item [out] 取出的数据
-     * @param timeout_ms 超时时间(毫秒)，-1=无限等待
-     * @return true=成功取出, false=超时或已关闭
-     */
-    bool pop(T& item, int timeout_ms = -1) {
-        std::unique_lock<std::mutex> lock(mutex_);
-        if (timeout_ms > 0) {
-            if (!not_empty_.wait_for(lock, std::chrono::milliseconds(timeout_ms),
-                                     [this]() { return !queue_.empty() || shutdown_; })) {
-                return false;  // 超时
-            }
-        } else {
-            not_empty_.wait(lock, [this]() { return !queue_.empty() || shutdown_; });
-        }
-        if (shutdown_ && queue_.empty()) return false;
-        item = std::move(queue_.front());
-        queue_.pop();
-        not_full_.notify_one();  // 唤醒一个等待的生产者
-        return true;
-    }
-
-    size_t size() const {
-        std::lock_guard<std::mutex> lock(mutex_);
-        return queue_.size();
-    }
-
-    void shutdown() {
-        std::lock_guard<std::mutex> lock(mutex_);
-        shutdown_ = true;
-        not_full_.notify_all();   // 唤醒所有等待的生产者
-        not_empty_.notify_all();  // 唤醒所有等待的消费者
-    }
-
-    void reset() {
-        std::lock_guard<std::mutex> lock(mutex_);
-        while (!queue_.empty()) queue_.pop();
-        shutdown_ = false;
-    }
-
-private:
-    mutable std::mutex mutex_;            // 互斥锁，保护队列操作
-    std::condition_variable not_full_;    // 队列未满条件（生产者等待）
-    std::condition_variable not_empty_;   // 队列非空条件（消费者等待）
-    std::queue<T> queue_;                 // 实际数据队列
-    size_t max_size_;                     // 队列最大容量
-    bool shutdown_;                       // 关闭标志
-};
+using ThreadSafeQueue = BoundedQueue<T>;
 
 // ============================================================================
 // 流水线性能指标
@@ -200,7 +125,8 @@ public:
     using Ptr = std::shared_ptr<PipelineStage>;
 
     explicit PipelineStage(const std::string& name, size_t queue_size = 32)
-        : name_(name), enabled_(true), input_queue_(queue_size), metrics_{name_} {}
+        : name_(name), enabled_(true),
+          input_queue_(queue_size, OverflowPolicy::DropOldest), metrics_{name_} {}
 
     virtual ~PipelineStage() { stop(); }
 
@@ -210,6 +136,7 @@ public:
      */
     virtual bool start() {
         if (worker_.joinable()) return true;
+        input_queue_.reset();
         running_ = true;
         worker_ = std::thread(&PipelineStage::processLoop, this);
         ROS_INFO("[Pipeline] Stage '%s' started.", name_.c_str());
@@ -239,9 +166,13 @@ public:
 
     void setEnabled(bool enabled) { enabled_ = enabled; }
     bool isEnabled() const { return enabled_; }
-    const PipelineMetrics& getMetrics() const { return metrics_; }
+    PipelineMetrics getMetrics() const {
+        std::lock_guard<std::mutex> lock(metrics_mutex_);
+        return metrics_;
+    }
     std::string getName() const { return name_; }
     size_t getQueueSize() const { return input_queue_.size(); }
+    size_t getDroppedCount() const { return input_queue_.dropped(); }
 
 protected:
     /**
@@ -257,6 +188,7 @@ protected:
     ThreadSafeQueue<StampedPointCloud::Ptr> input_queue_;  // 输入队列
     std::thread                  worker_;      // 工作线程
     PipelineMetrics              metrics_;     // 性能统计
+    mutable std::mutex           metrics_mutex_;
     PipelineStage::Ptr           next_stage_;  // 下一个Stage
 
 private:
@@ -295,7 +227,10 @@ private:
             // 记录耗时
             auto elapsed = std::chrono::duration<double, std::milli>(
                 std::chrono::steady_clock::now() - start_time).count();
-            metrics_.update(elapsed);
+            {
+                std::lock_guard<std::mutex> lock(metrics_mutex_);
+                metrics_.update(elapsed);
+            }
         }
     }
 };
@@ -342,8 +277,8 @@ public:
 
     void stop() {
         running_ = false;
-        for (auto& stage : stages_) {
-            stage->stop();  // 每个Stage停止自己的处理线程
+        for (auto it = stages_.rbegin(); it != stages_.rend(); ++it) {
+            (*it)->stop();  // 先关闭下游，使上游 enqueue 立即失败
         }
         ROS_INFO("[Pipeline] Pipeline stopped.");
     }
@@ -367,12 +302,12 @@ public:
     void printMetricsReport() const {
         ROS_INFO("========== Pipeline Performance Report ==========");
         for (const auto& stage : stages_) {
-            const auto& m = stage->getMetrics();
-            ROS_INFO("  [%s] total=%zu  avg=%.2fms  max=%.2fms  min=%.2fms  queue=%zu",
+            const auto m = stage->getMetrics();
+            ROS_INFO("  [%s] total=%zu avg=%.2fms max=%.2fms min=%.2fms queue=%zu dropped=%zu",
                      stage->getName().c_str(),
                      m.total_processed, m.avg_process_time_ms,
                      m.max_process_time_ms, m.min_process_time_ms,
-                     stage->getQueueSize());
+                     stage->getQueueSize(), stage->getDroppedCount());
         }
         ROS_INFO("================================================");
     }

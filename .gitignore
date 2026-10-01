@@ -9,3 +9,4 @@
 *.user
 *.swp
 /data/
+src/lslidar_ls_driver/tests/host/*.exe

@@ -23,6 +23,7 @@ find_package(catkin REQUIRED COMPONENTS
     nodelet
     dynamic_reconfigure
     message_generation
+    message_runtime
     std_msgs
     sensor_msgs
     visualization_msgs
@@ -53,7 +54,7 @@ catkin_package(
     INCLUDE_DIRS include
     CATKIN_DEPENDS
     roscpp nodelet pcl_ros pcl_conversions std_msgs sensor_msgs
-    visualization_msgs nav_msgs tf2_ros
+    visualization_msgs nav_msgs tf2_ros message_runtime
 )
 
 include_directories(include ${catkin_INCLUDE_DIRS})
@@ -144,29 +145,19 @@ endif()
 if(CATKIN_ENABLE_TESTING)
     find_package(rostest REQUIRED)
 
-    # 测试: Pipeline框架
-    add_executable(test_pipeline tests/test_pipeline.cpp)
-    target_link_libraries(test_pipeline ${catkin_LIBRARIES} ${GTEST_LIBRARIES})
-    add_rostest_gtest(test_pipeline_node
-        tests/test_pipeline.test
-        test_pipeline
-    )
+    catkin_add_gtest(test_pipeline tests/test_pipeline.cpp)
+    catkin_add_gtest(test_filter tests/test_filter.cpp)
+    catkin_add_gtest(test_ground_seg tests/test_ground_seg.cpp)
+    catkin_add_gtest(test_clustering tests/test_clustering.cpp)
+    foreach(test_target test_pipeline test_filter test_ground_seg test_clustering)
+        if(TARGET ${test_target})
+            target_link_libraries(${test_target} ${catkin_LIBRARIES})
+        endif()
+    endforeach()
 
-    # 测试: 滤波算法
-    add_executable(test_filter tests/test_filter.cpp)
-    target_link_libraries(test_filter ${catkin_LIBRARIES} ${GTEST_LIBRARIES})
-    add_rostest_gtest(test_filter_node
-        tests/test_filter.test
-        test_filter
-    )
-
-    # 测试: 地面分割
-    add_executable(test_ground_seg tests/test_ground_seg.cpp)
-    target_link_libraries(test_ground_seg ${catkin_LIBRARIES} ${GTEST_LIBRARIES})
-
-    # 测试: 聚类
-    add_executable(test_clustering tests/test_clustering.cpp)
-    target_link_libraries(test_clustering ${catkin_LIBRARIES} ${GTEST_LIBRARIES})
+    add_executable(test_bounded_queue tests/host/test_bounded_queue.cpp)
+    target_link_libraries(test_bounded_queue pthread)
+    add_test(NAME bounded_queue COMMAND test_bounded_queue)
 endif()
 
 # ===========================================================================

@@ -71,6 +71,8 @@ namespace lslidar_ch_driver {
     InputSocket::InputSocket(ros::NodeHandle private_nh, uint16_t port) : Input(private_nh, port) {
 
         sockfd_ = -1;
+        efd_ = -1;
+        memset(&devip_, 0, sizeof(devip_));
 
         if (!devip_str_.empty()) {
             inet_aton(devip_str_.c_str(), &devip_);
@@ -85,6 +87,8 @@ namespace lslidar_ch_driver {
         int opt = 1;
         if (setsockopt(sockfd_, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt)) < 0){
             perror("setsockopt error!\n");
+            close(sockfd_);
+            sockfd_ = -1;
             return;
         }
         sockaddr_in my_addr{};                   // my address information
@@ -95,6 +99,8 @@ namespace lslidar_ch_driver {
 
         if (bind(sockfd_, (sockaddr *) &my_addr, sizeof(sockaddr)) == -1) {
             perror("bind");  // TODO: ROS_ERROR errno
+            close(sockfd_);
+            sockfd_ = -1;
             return;
         }
         if (add_multicast) {
@@ -108,7 +114,8 @@ namespace lslidar_ch_driver {
             if (setsockopt(sockfd_, IPPROTO_IP, IP_ADD_MEMBERSHIP, (char *) &group, sizeof(group)) < 0) {
                 perror("Adding multicast group error ");
                 close(sockfd_);
-                exit(1);
+                sockfd_ = -1;
+                return;
             } else
                 printf("Adding multicast group...OK.\n");
         }
@@ -116,44 +123,57 @@ namespace lslidar_ch_driver {
 
         if (fcntl(sockfd_, F_SETFL, O_NONBLOCK | FASYNC) < 0) {
             perror("non-block");
+            close(sockfd_);
+            sockfd_ = -1;
             return;
         }
 
-        efd = epoll_create1(0);
-        if (efd ==-1) {
+        efd_ = epoll_create1(EPOLL_CLOEXEC);
+        if (efd_ == -1) {
             perror("Failed to create epoll file descriptor");
+            close(sockfd_);
+            sockfd_ = -1;
             return;
         }
 
         struct epoll_event ev;
         ev.events = EPOLLIN;
         ev.data.fd = sockfd_;
-        if (epoll_ctl(efd, EPOLL_CTL_ADD, sockfd_, &ev) == -1) {
+        if (epoll_ctl(efd_, EPOLL_CTL_ADD, sockfd_, &ev) == -1) {
             perror("Failed to add socket to epoll");
-            close(efd);
+            close(efd_);
+            close(sockfd_);
+            efd_ = -1;
+            sockfd_ = -1;
             return;
         }
     }
 
 /** @brief destructor */
     InputSocket::~InputSocket(void) {
-        (void) close(sockfd_);
+        if (efd_ >= 0) (void)close(efd_);
+        if (sockfd_ >= 0) (void)close(sockfd_);
     }
 
-#if 0
     int InputSocket::getPacket(lslidar_ls_driver::LslidarLsPacketPtr &packet) {
+        if (efd_ < 0 || sockfd_ < 0) return -1;
         struct epoll_event events[1];
-        int nfds = epoll_wait(efd, events, 1, 3000);
+        int nfds = epoll_wait(efd_, events, 1, 3000);
         
         if (nfds <= 0) {
           if (nfds == 0) {
-            ROS_WARN("lslidar poll() timeout, port:%d", port_);
+            ROS_WARN("lslidar epoll timeout, port:%d", port_);
             return 1;
           } else if (errno != EINTR) {
-            ROS_ERROR("poll() error: %s", strerror(errno));
+            ROS_ERROR("epoll_wait() error: %s", strerror(errno));
           }
             return 1;
-        }          
+        }
+        if ((events[0].events & (EPOLLERR | EPOLLHUP)) != 0 ||
+            (events[0].events & EPOLLIN) == 0) {
+            ROS_ERROR("epoll reports a LiDAR socket error");
+            return -1;
+        }
 
         sockaddr_in sender_address{};
         socklen_t sender_address_len = sizeof(sender_address);
@@ -164,10 +184,11 @@ namespace lslidar_ch_driver {
         ssize_t nbytes = recvfrom(sockfd_, &packet->data[0], PACKET_SIZE, 0,
                                     (sockaddr *) &sender_address, &sender_address_len);
 
-        if (nbytes == PACKET_SIZE && sender_address.sin_addr.s_addr == devip_.s_addr) {
+        if (nbytes == PACKET_SIZE &&
+            (devip_str_.empty() || sender_address.sin_addr.s_addr == devip_.s_addr)) {
             return 0; // Success
         } else {
-            if (nbytes == PACKET_SIZE && sender_address.sin_addr.s_addr != devip_.s_addr) ROS_WARN_THROTTLE(2, "lidar ip  parameter error, please reset lidar ip in launch file.");
+            if (nbytes == PACKET_SIZE && !devip_str_.empty() && sender_address.sin_addr.s_addr != devip_.s_addr) ROS_WARN_THROTTLE(2, "lidar ip parameter error, please reset lidar ip in launch file.");
             if (nbytes < 0 && errno != EWOULDBLOCK) {
                 perror("recvfail");
                 ROS_INFO("recvfail");
@@ -177,57 +198,6 @@ namespace lslidar_ch_driver {
 
         return 1;
     }
-#else
-    int InputSocket::getPacket(lslidar_ls_driver::LslidarLsPacketPtr &packet) {
-        struct pollfd fds[1];
-        fds[0].fd = sockfd_;
-        fds[0].events = POLLIN;
-        static const int POLL_TIMEOUT = 3000; // one second (in msec)
-
-        sockaddr_in sender_address{};
-        socklen_t sender_address_len = sizeof(sender_address);
-
-        do {
-            int retval = poll(fds, 1, POLL_TIMEOUT);
-            if (retval < 0)             // poll() error?
-            {
-                if (errno != EINTR)
-                    ROS_ERROR("poll() error: %s", strerror(errno));
-                return 1;
-            }
-            if (retval == 0)            // poll() timeout?
-            {
-                ROS_WARN("lslidar poll() timeout, port:%d",port_);
-                return 1;
-            }
-            if ((fds[0].revents & POLLERR)
-                || (fds[0].revents & POLLHUP)
-                || (fds[0].revents & POLLNVAL)) // device error?
-            {
-                ROS_ERROR("poll() reports lslidar error");
-                return 1;
-            }
-        } while ((fds[0].revents & POLLIN) == 0);
-
-        // Receive packets that should now be available from the
-        // socket using a blocking read.
-        ssize_t nbytes = recvfrom(sockfd_, &packet->data[0], PACKET_SIZE, 0,
-                                    (sockaddr *) &sender_address, &sender_address_len);
-
-        if (nbytes == PACKET_SIZE && sender_address.sin_addr.s_addr == devip_.s_addr) {
-            return 0; // Success
-        } else {
-            if (nbytes == PACKET_SIZE && sender_address.sin_addr.s_addr != devip_.s_addr) ROS_WARN_THROTTLE(2, "lidar ip  parameter error, please reset lidar ip in launch file.");
-            if (nbytes < 0 && errno != EWOULDBLOCK) {
-                perror("recvfail");
-                ROS_INFO("recvfail");
-                return -1;
-            }
-        }
-
-        return 1;
-    }
-#endif
 
     InputPCAP::InputPCAP(ros::NodeHandle private_nh, uint16_t port, double packet_rate, std::string filename,
                          bool read_once, bool read_fast, double repeat_delay) : Input(private_nh, port),
@@ -235,9 +205,9 @@ namespace lslidar_ch_driver {
                                                                                 filename_(filename) {
         pcap_ = nullptr;
         empty_ = true;
-        private_nh.param("read_once", read_once_, false);
-        private_nh.param("read_fast", read_fast_, false);
-        private_nh.param("repeat_delay", repeat_delay_, 0.0);
+        private_nh.param("read_once", read_once_, read_once);
+        private_nh.param("read_fast", read_fast_, read_fast);
+        private_nh.param("repeat_delay", repeat_delay_, repeat_delay);
         if (read_once_)
             ROS_INFO("Read input file only once.");
         if (read_fast_)
@@ -258,7 +228,7 @@ namespace lslidar_ch_driver {
     }
 
     InputPCAP::~InputPCAP() {
-        pcap_close(pcap_);
+        if (pcap_ != nullptr) pcap_close(pcap_);
     }
 
     int InputPCAP::getPacket(lslidar_ls_driver::LslidarLsPacketPtr &pkt) {
@@ -278,10 +248,14 @@ namespace lslidar_ch_driver {
                     packet_rate_.sleep();
                 }
 
-                mempcpy(&pkt->data[0], pkt_data + 42, packet_size);
+                if (header->caplen < 42 + packet_size) {
+                    ROS_WARN_THROTTLE(2, "truncated PCAP frame: %u bytes", header->caplen);
+                    continue;
+                }
+                memcpy(&pkt->data[0], pkt_data + 42, packet_size);
                 if (pkt->data[0] == 0x00 && pkt->data[1] == 0xFF && pkt->data[2] == 0x00 &&
                     pkt->data[3] == 0x5A) {
-                    int rpm = (pkt->data[8] << 8) | pkt_data[9];
+                    int rpm = (pkt->data[8] << 8) | pkt->data[9];
                     int mode = 1;
                     if ((pkt->data[45] == 0x08 && pkt->data[46] == 0x02 && pkt->data[47] >= 0x09) ||
                         (pkt->data[45] > 0x08) ||
@@ -306,6 +280,7 @@ namespace lslidar_ch_driver {
             }
             if (read_once_) {
                 ROS_INFO("end of file reached-- done reading.");
+                return -1;
             }
             if (repeat_delay_ > 0.0) {
                 ROS_INFO("end of file reached -- delaying %.3f seconds.", repeat_delay_);
@@ -317,9 +292,6 @@ namespace lslidar_ch_driver {
             empty_ = true;
 //            ROS_INFO("replaying lslidar dump file");
             count_frame = 0;
-        }
-        if (flag == 0) {
-            abort();
         }
         return -1;
     }
