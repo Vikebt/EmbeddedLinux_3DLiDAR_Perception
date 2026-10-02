@@ -1,5 +1,7 @@
 # 面试证据索引：三维 LiDAR 感知
 
+总讲义见 [模块化五项目面试讲义](https://github.com/Vikebt/EmbeddedLinux_IMX6ULL_ConditionMonitor/tree/main/docs/interview-handbook)，本项目重点对应 [进程线程](https://github.com/Vikebt/EmbeddedLinux_IMX6ULL_ConditionMonitor/blob/main/docs/interview-handbook/03-linux-process-thread.md)、[I/O 与网络](https://github.com/Vikebt/EmbeddedLinux_IMX6ULL_ConditionMonitor/blob/main/docs/interview-handbook/04-linux-io-network.md)、[P3 项目故事](https://github.com/Vikebt/EmbeddedLinux_IMX6ULL_ConditionMonitor/blob/main/docs/interview-handbook/06-project-stories.md#p3三维-lidar-感知) 与实验手册。固定证据标签为本仓库 `study-step-2-overload-policy`；总讲义固定标签为 `study-step-7-detailed-handbook`。
+
 | 常见问题 | 代码证据 | 可以展开的回答 |
 |---|---|---|
 | `select/poll/epoll` 怎么选？ | `src/input.cc` | 单个雷达也可用 `poll`，这里保留 `epoll` 是为了统一未来多 socket 事件循环；使用非阻塞 socket 并处理 EINTR、超时和错误事件 |

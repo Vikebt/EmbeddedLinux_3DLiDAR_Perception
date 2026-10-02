@@ -6,6 +6,7 @@
 > **技术栈**：C++17、ROS/catkin、PCL、UDP/epoll、RViz、Python/PyQt 辅助工具
 > **仓库实现范围**：LiDAR 数据链路、点云感知管线、资源监控、ROS 集成和 Jetson 交叉编译配置。是否完成特定硬件现场部署应以对应验证记录为准。
 > **项目资料**：[验证边界与面试证据](src/lslidar_ls_driver/INTERVIEW_EVIDENCE.md)
+> **面试学习入口**：[五项目讲义（main）](https://github.com/Vikebt/EmbeddedLinux_IMX6ULL_ConditionMonitor/tree/main/docs/interview-handbook) · [固定版本](https://github.com/Vikebt/EmbeddedLinux_IMX6ULL_ConditionMonitor/tree/study-step-7-detailed-handbook/docs/interview-handbook) · [Linux I/O/网络](https://github.com/Vikebt/EmbeddedLinux_IMX6ULL_ConditionMonitor/blob/main/docs/interview-handbook/04-linux-io-network.md) · [P3 项目故事](https://github.com/Vikebt/EmbeddedLinux_IMX6ULL_ConditionMonitor/blob/main/docs/interview-handbook/06-project-stories.md#p3三维-lidar-感知)
 
 ## 项目背景
 
