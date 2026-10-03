@@ -12,12 +12,21 @@ jobs:
       image: rostooling/setup-ros-docker:ubuntu-focal-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Diagnose nested package discovery
+      - name: Install ROS build dependencies
         run: |
-          colcon list --base-paths src
-          colcon list --base-paths src/lslidar_ls_driver | grep lslidar_ls_driver
-      - uses: ros-tooling/action-ros-ci@v0.4
-        with:
-          package-name: lslidar_ls_driver
-          target-ros1-distro: noetic
-          coverage-result: false
+          apt-get update
+          apt-get install -y --no-install-recommends \
+            ros-noetic-ros-base \
+            ros-noetic-pcl-ros \
+            ros-noetic-pcl-conversions \
+            ros-noetic-nodelet \
+            ros-noetic-dynamic-reconfigure \
+            ros-noetic-diagnostic-updater \
+            ros-noetic-visualization-msgs \
+            ros-noetic-rostest \
+            libpcap-dev
+      - name: Build complete catkin package
+        shell: bash
+        run: |
+          source /opt/ros/noetic/setup.bash
+          catkin_make -DCMAKE_BUILD_TYPE=Release -j2
