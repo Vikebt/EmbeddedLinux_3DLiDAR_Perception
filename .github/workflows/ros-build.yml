@@ -30,3 +30,9 @@ jobs:
         run: |
           source /opt/ros/noetic/setup.bash
           catkin_make -DCMAKE_BUILD_TYPE=Release -j2
+      - name: Run catkin regression tests
+        shell: bash
+        run: |
+          source /opt/ros/noetic/setup.bash
+          catkin_make run_tests -j2
+          catkin_test_results --verbose
