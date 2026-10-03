@@ -137,9 +137,10 @@ add_dependencies(lslidar_ls_pipeline_node
 # ===========================================================================
 # 依赖链接（确保input库正确依赖消息生成）
 # ===========================================================================
-if (catkin_EXPORTED_TARGETS)
-    add_dependencies(lslidar_ls_input ${catkin_EXPORTED_TARGETS})
-endif()
+add_dependencies(lslidar_ls_input
+    ${${PROJECT_NAME}_EXPORTED_TARGETS}
+    ${catkin_EXPORTED_TARGETS}
+)
 
 # ===========================================================================
 # 单元测试 (需要catkin中启用测试)
