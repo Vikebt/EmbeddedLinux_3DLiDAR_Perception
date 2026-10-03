@@ -7,7 +7,9 @@ project(lslidar_ls_driver)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 add_compile_options(-Wall -Wextra -Wno-unused-parameter)
-set(CMAKE_BUILD_TYPE Release)
+if(NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
+    set(CMAKE_BUILD_TYPE Release CACHE STRING "Build type" FORCE)
+endif()
 
 message("cmake_build_type: " ${CMAKE_BUILD_TYPE})
 
@@ -158,6 +160,7 @@ if(CATKIN_ENABLE_TESTING)
     add_executable(test_bounded_queue tests/host/test_bounded_queue.cpp)
     target_link_libraries(test_bounded_queue pthread)
     add_test(NAME bounded_queue COMMAND test_bounded_queue)
+    set_tests_properties(bounded_queue PROPERTIES TIMEOUT 5)
 endif()
 
 # ===========================================================================

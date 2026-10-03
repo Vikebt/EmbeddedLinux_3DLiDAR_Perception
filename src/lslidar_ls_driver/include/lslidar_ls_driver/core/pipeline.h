@@ -30,6 +30,7 @@
 #define LSLIDAR_LS_PIPELINE_H
 
 #include <memory>
+#include <cstdint>
 #include <string>
 #include <vector>
 #include <functional>
@@ -95,9 +96,11 @@ struct PipelineMetrics {
 // 带时间戳的点云数据包
 // ============================================================================
 struct StampedPointCloud {
+    using Ptr = std::shared_ptr<StampedPointCloud>;
     pcl::PointCloud<pcl::PointXYZI>::Ptr cloud;  // 点云数据
     ros::Time stamp;                              // 时间戳
-    uint64_t  frame_id{0};                        // 帧序号
+    std::string frame_id;
+    uint64_t frame_sequence{0};
     double    acquisition_time{0.0};              // 采集时间
 
     StampedPointCloud()

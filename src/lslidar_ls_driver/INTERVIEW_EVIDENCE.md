@@ -11,7 +11,8 @@
 | 线程怎么优雅退出？ | `PipelineStage::stop`、`PipelineController::stop` | atomic 运行标志 + queue shutdown + join；控制器按下游到上游顺序停止，避免生产者卡在已停止消费者前 |
 | 什么是数据竞争？ | `PipelineStage::metrics_mutex_` | 处理线程写指标、ROS 定时器读指标，必须在同一互斥量下获取快照，不能靠普通结构体“碰巧可用” |
 | PCAP 回放要检查什么？ | `InputPCAP::getPacket` | 检查截断帧长度、一次回放 EOF 语义、过滤器结果，并避免 `abort()` 破坏正常退出 |
+| 点云帧怎样保留来源？ | `StampedPointCloud` 与增强驱动各 Stage | 传递字符串坐标系 ID 与递增帧序号；Marker/PointCloud2 使用输入帧 ID，不把输出写死为 `laser_link` |
 
 ## 验证边界
 
-独立主机测试覆盖队列的丢旧保新、阻塞唤醒、关闭与复用。完整 ROS/PCL 构建需要对应 ROS1 环境；没有 LS1550 与 Jetson 时，不声称完成硬件吞吐、丢包率或温度功耗验证。
+独立主机 Debug/Release 测试覆盖队列的丢旧保新、阻塞唤醒、关闭与复用，均 1/1 通过且设置 5 秒超时。全量 catkin 配置不再强制覆盖显式 Debug；但当前环境没有 ROS/PCL，增强驱动元数据修改尚未完成 ROS 编译验证。没有 LS1550 与 Jetson 时，不声称完成硬件吞吐、丢包率或温度功耗验证。
