@@ -1,0 +1,38 @@
+name: ROS Noetic integration
+
+on:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  catkin:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    container:
+      image: rostooling/setup-ros-docker:ubuntu-focal-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install ROS build dependencies
+        run: |
+          apt-get update
+          apt-get install -y --no-install-recommends \
+            ros-noetic-ros-base \
+            ros-noetic-pcl-ros \
+            ros-noetic-pcl-conversions \
+            ros-noetic-nodelet \
+            ros-noetic-dynamic-reconfigure \
+            ros-noetic-diagnostic-updater \
+            ros-noetic-visualization-msgs \
+            ros-noetic-rostest \
+            libpcap-dev
+      - name: Build complete catkin package
+        shell: bash
+        run: |
+          source /opt/ros/noetic/setup.bash
+          catkin_make -DCMAKE_BUILD_TYPE=Release -j2
+      - name: Run catkin regression tests
+        shell: bash
+        run: |
+          source /opt/ros/noetic/setup.bash
+          catkin_make run_tests -j2
+          catkin_test_results --verbose

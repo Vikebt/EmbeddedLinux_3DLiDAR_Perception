@@ -66,6 +66,7 @@ protected:
         result->cloud = filtered;
         result->stamp = data->stamp;
         result->frame_id = data->frame_id;
+        result->frame_sequence = data->frame_sequence;
         result->acquisition_time = data->acquisition_time;
         return result;
     }
@@ -104,11 +105,12 @@ protected:
         if (!data || !data->cloud || data->cloud->empty()) return nullptr;
         last_result_ = detector_->detect(data->cloud);
         if (marker_pub_.getNumSubscribers() > 0) {
-            publishMarkers(last_result_);
+            publishMarkers(last_result_, data->frame_id);
         }
         auto result = std::make_shared<StampedPointCloud>();
         result->stamp = data->stamp;
         result->frame_id = data->frame_id;
+        result->frame_sequence = data->frame_sequence;
         result->cloud = last_result_.colored_cloud;
         return result;
     }
@@ -118,12 +120,13 @@ private:
     algorithm::DetectionResult last_result_;
     ros::Publisher marker_pub_;
 
-    void publishMarkers(const algorithm::DetectionResult& result) {
+    void publishMarkers(const algorithm::DetectionResult& result,
+                        const std::string& frame_id) {
         visualization_msgs::MarkerArray markers;
         int id = 0;
         for (const auto& obs : result.obstacles) {
             visualization_msgs::Marker marker;
-            marker.header.frame_id = "laser_link";
+            marker.header.frame_id = frame_id;
             marker.header.stamp = ros::Time::now();
             marker.ns = "obstacles";
             marker.id = id++;
@@ -152,7 +155,7 @@ private:
         // 盲降区标记
         if (result.safety_zone.landing_zone.is_suitable) {
             visualization_msgs::Marker lz_marker;
-            lz_marker.header.frame_id = "laser_link";
+            lz_marker.header.frame_id = frame_id;
             lz_marker.header.stamp = ros::Time::now();
             lz_marker.ns = "landing_zone";
             lz_marker.id = 0;
@@ -188,7 +191,7 @@ protected:
         if (cloud_pub_.getNumSubscribers() > 0) {
             sensor_msgs::PointCloud2 msg;
             pcl::toROSMsg(*data->cloud, msg);
-            msg.header.frame_id = "laser_link";
+            msg.header.frame_id = data->frame_id;
             msg.header.stamp = data->stamp;
             cloud_pub_.publish(msg);
         }
@@ -251,6 +254,7 @@ public:
                 data->frame_id = base_driver_->frame_id;
             }
             data->stamp = ros::Time::now();
+            data->frame_sequence = ++frame_sequence_;
             pipeline_.feed(data);
 
             // 记录资源监控延迟
@@ -280,6 +284,7 @@ private:
     platform::ResourceMonitor resource_monitor_;
     ros::Timer diag_timer_;
     std::string frame_id_;
+    uint64_t frame_sequence_{0};
 
     void loadParameters() {
         pnh_.param<std::string>("frame_id", frame_id_, "laser_link");

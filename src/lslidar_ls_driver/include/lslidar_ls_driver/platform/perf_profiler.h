@@ -16,7 +16,9 @@
 #include <chrono>
 #include <vector>
 #include <algorithm>
+#include <cmath>
 #include <mutex>
+#include <sstream>
 #include <ros/ros.h>
 
 namespace lslidar_ch_driver {
@@ -71,11 +73,7 @@ public:
         : label_(label), data_size_(data_size),
           start_(std::chrono::steady_clock::now()) {}
 
-    ~ScopedTimer() {
-        auto elapsed = std::chrono::duration<double, std::milli>(
-            std::chrono::steady_clock::now() - start_).count();
-        ProfilerManager::instance().recordSample(label_, elapsed, data_size_);
-    }
+    ~ScopedTimer();
 
 private:
     std::string label_;
@@ -181,6 +179,12 @@ private:
     size_t max_samples_{10000};
     std::unordered_map<std::string, std::vector<SampleData>> samples_;
 };
+
+inline ScopedTimer::~ScopedTimer() {
+    const auto elapsed = std::chrono::duration<double, std::milli>(
+        std::chrono::steady_clock::now() - start_).count();
+    ProfilerManager::instance().recordSample(label_, elapsed, data_size_);
+}
 
 // 方便使用的宏
 #define PROFILE_SCOPE(name) \
