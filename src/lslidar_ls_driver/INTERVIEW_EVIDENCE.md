@@ -15,4 +15,4 @@
 
 ## 验证边界
 
-独立主机 Debug/Release 测试覆盖队列的丢旧保新、阻塞唤醒、关闭与复用，均 1/1 通过且设置 5 秒超时。全量 catkin 配置不再强制覆盖显式 Debug；但当前环境没有 ROS/PCL，增强驱动元数据修改尚未完成 ROS 编译验证。没有 LS1550 与 Jetson 时，不声称完成硬件吞吐、丢包率或温度功耗验证。
+独立主机 Debug/Release 测试覆盖队列的丢旧保新、阻塞唤醒、关闭与复用，均 1/1 通过且设置 5 秒超时。完整 ROS Noetic/Focal catkin 构建已在 [GitHub CI](https://github.com/Vikebt/EmbeddedLinux_3DLiDAR_Perception/actions/runs/37107765130) 通过；该构建同时发现并修复消息生成依赖竞态、性能统计头文件的声明顺序问题。CI 证明源码可构建，不等同于 ROS 节点运行、LS1550 与 Jetson 吞吐、丢包率或温度功耗验证。
