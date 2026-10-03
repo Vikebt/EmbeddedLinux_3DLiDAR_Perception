@@ -11,6 +11,11 @@ jobs:
     container:
       image: rostooling/setup-ros-docker:ubuntu-focal-latest
     steps:
+      - uses: actions/checkout@v4
+      - name: Diagnose nested package discovery
+        run: |
+          colcon list --base-paths src
+          colcon list --base-paths src/lslidar_ls_driver | grep lslidar_ls_driver
       - uses: ros-tooling/action-ros-ci@v0.4
         with:
           package-name: lslidar_ls_driver
