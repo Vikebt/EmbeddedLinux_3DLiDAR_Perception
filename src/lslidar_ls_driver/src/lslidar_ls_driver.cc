@@ -18,6 +18,7 @@
 
 #include <lslidar_ls_driver/lslidar_ls_driver.h>
 #include <algorithm>
+#include <cstdio>
 #include <memory>
 
 using namespace std::chrono;
@@ -599,6 +600,7 @@ namespace lslidar_ch_driver {
         }
 
         std::cout << std::endl;
+        std::fprintf(stderr, "[BaseInit] Mode packet accepted; returning\n");
 
         return true;
     };

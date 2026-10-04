@@ -34,6 +34,7 @@
 
 #include <memory>
 #include <atomic>
+#include <cstdio>
 #include <visualization_msgs/MarkerArray.h>
 #include <nav_msgs/OccupancyGrid.h>
 
@@ -215,10 +216,12 @@ public:
     bool initialize() {
         loadParameters();
         base_driver_ = std::make_unique<LslidarChDriver>(nh_, pnh_);
+        std::fprintf(stderr, "[EnhancedInit] Calling base initialize\n");
         if (!base_driver_->initialize()) {
             ROS_ERROR("Failed to initialize base LiDAR driver.");
             return false;
         }
+        std::fprintf(stderr, "[EnhancedInit] Base initialize returned\n");
         ROS_INFO("[EnhancedInit] Base driver ready");
         setupPipeline();
         ROS_INFO("[EnhancedInit] Pipeline stages ready");
