@@ -219,9 +219,13 @@ public:
             ROS_ERROR("Failed to initialize base LiDAR driver.");
             return false;
         }
+        ROS_INFO("[EnhancedInit] Base driver ready");
         setupPipeline();
+        ROS_INFO("[EnhancedInit] Pipeline stages ready");
         createPublishers();
+        ROS_INFO("[EnhancedInit] Publishers ready");
         resource_monitor_.start();
+        ROS_INFO("[EnhancedInit] Resource monitor ready");
         platform::ProfilerManager::instance().setMaxSamples(10000);
         diag_timer_ = nh_.createTimer(ros::Duration(10.0),
             &EnhancedLslidarDriver::diagnosticCallback, this);
