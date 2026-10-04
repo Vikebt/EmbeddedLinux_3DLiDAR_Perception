@@ -40,7 +40,7 @@ def check_signal(binary, sig, active=False):
             sender = threading.Thread(target=send_mode_packet)
             sender.start()
             deadline = time.monotonic() + 8.0
-            while b"Enhanced driver started" not in observed and time.monotonic() < deadline:
+            while b"[EnhancedNode] Entering spin" not in observed and time.monotonic() < deadline:
                 if process.poll() is not None:
                     break
                 readable, _, _ = select.select([process.stdout], [], [], 0.1)
@@ -48,7 +48,7 @@ def check_signal(binary, sig, active=False):
                     observed += os.read(process.stdout.fileno(), 65536)
             sender_stop.set()
             sender.join()
-            if b"Enhanced driver started" not in observed:
+            if b"[EnhancedNode] Entering spin" not in observed:
                 raise AssertionError(
                     f"node did not reach active state before {sig.name}: "
                     f"exit={process.poll()}\n{observed.decode(errors='replace')}"

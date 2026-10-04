@@ -238,6 +238,7 @@ public:
         ROS_INFO("===== Enhanced LiDAR Driver Initialized =====");
         ROS_INFO("Pipeline: Filter -> Perception -> Visualize");
         ROS_INFO("Resource Monitor: every 0.5 sec");
+        std::fprintf(stderr, "[EnhancedInit] Returning success\n");
         return true;
     }
 
