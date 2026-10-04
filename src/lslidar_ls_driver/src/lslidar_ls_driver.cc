@@ -62,7 +62,7 @@ namespace lslidar_ch_driver {
     }
 
     LslidarChDriver::~LslidarChDriver() {
-        if (nullptr == difop_thread_) {
+        if (difop_thread_ && difop_thread_->joinable()) {
             difop_thread_->join();
         }
         (void) close(socket_id);
