@@ -298,9 +298,13 @@ private:
     }
 
     void setupPipeline() {
+        std::fprintf(stderr, "[EnhancedInit] Constructing PreFilterStage\n");
         filter_stage_ = std::make_shared<PreFilterStage>();
+        std::fprintf(stderr, "[EnhancedInit] Constructing PerceptionStage\n");
         perception_stage_ = std::make_shared<PerceptionStage>();
+        std::fprintf(stderr, "[EnhancedInit] Constructing VisualizationStage\n");
         vis_stage_ = std::make_shared<VisualizationStage>();
+        std::fprintf(stderr, "[EnhancedInit] Linking stages\n");
         pipeline_.addStage(filter_stage_);
         pipeline_.addStage(perception_stage_);
         pipeline_.addStage(vis_stage_);
