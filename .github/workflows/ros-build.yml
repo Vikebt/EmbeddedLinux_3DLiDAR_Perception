@@ -44,3 +44,5 @@ jobs:
           rosparam list >/dev/null
           timeout 180 catkin_make run_tests -j2
           catkin_test_results --verbose
+          python3 src/lslidar_ls_driver/tests/test_node_signal_exit.py \
+            devel/lib/lslidar_ls_driver/lslidar_ls_driver_enhanced_node
