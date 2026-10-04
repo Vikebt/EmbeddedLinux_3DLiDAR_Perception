@@ -41,7 +41,6 @@ int main(int argc, char** argv) {
     }
 
     ROS_INFO("Enhanced driver started. Processing point cloud pipeline...");
-    std::fprintf(stderr, "[EnhancedNode] Entering spin\n");
     driver.spin();
 
     ROS_INFO("Enhanced driver shutting down...");

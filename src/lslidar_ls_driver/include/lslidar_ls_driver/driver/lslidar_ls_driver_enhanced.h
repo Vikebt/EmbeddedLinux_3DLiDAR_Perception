@@ -34,7 +34,6 @@
 
 #include <memory>
 #include <atomic>
-#include <cstdio>
 #include <visualization_msgs/MarkerArray.h>
 #include <nav_msgs/OccupancyGrid.h>
 
@@ -216,29 +215,20 @@ public:
     bool initialize() {
         loadParameters();
         base_driver_ = std::make_unique<LslidarChDriver>(nh_, pnh_);
-        std::fprintf(stderr, "[EnhancedInit] Calling base initialize\n");
         if (!base_driver_->initialize()) {
             ROS_ERROR("Failed to initialize base LiDAR driver.");
             return false;
         }
-        std::fprintf(stderr, "[EnhancedInit] Base initialize returned\n");
-        std::fprintf(stderr, "[EnhancedInit] Before pipeline stages\n");
         setupPipeline();
-        std::fprintf(stderr, "[EnhancedInit] Pipeline stages ready\n");
         createPublishers();
-        std::fprintf(stderr, "[EnhancedInit] Publishers ready\n");
         resource_monitor_.start();
-        std::fprintf(stderr, "[EnhancedInit] Resource monitor ready\n");
         platform::ProfilerManager::instance().setMaxSamples(10000);
-        std::fprintf(stderr, "[EnhancedInit] Profiler ready\n");
         diag_timer_ = nh_.createTimer(ros::Duration(10.0),
             &EnhancedLslidarDriver::diagnosticCallback, this);
-        std::fprintf(stderr, "[EnhancedInit] Diagnostics timer ready\n");
 
         ROS_INFO("===== Enhanced LiDAR Driver Initialized =====");
         ROS_INFO("Pipeline: Filter -> Perception -> Visualize");
         ROS_INFO("Resource Monitor: every 0.5 sec");
-        std::fprintf(stderr, "[EnhancedInit] Returning success\n");
         return true;
     }
 
@@ -301,13 +291,9 @@ private:
     }
 
     void setupPipeline() {
-        std::fprintf(stderr, "[EnhancedInit] Constructing PreFilterStage\n");
         filter_stage_ = std::make_shared<PreFilterStage>();
-        std::fprintf(stderr, "[EnhancedInit] Constructing PerceptionStage\n");
         perception_stage_ = std::make_shared<PerceptionStage>();
-        std::fprintf(stderr, "[EnhancedInit] Constructing VisualizationStage\n");
         vis_stage_ = std::make_shared<VisualizationStage>();
-        std::fprintf(stderr, "[EnhancedInit] Linking stages\n");
         pipeline_.addStage(filter_stage_);
         pipeline_.addStage(perception_stage_);
         pipeline_.addStage(vis_stage_);
