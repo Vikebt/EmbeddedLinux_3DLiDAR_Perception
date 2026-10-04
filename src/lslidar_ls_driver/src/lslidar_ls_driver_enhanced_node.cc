@@ -15,6 +15,7 @@ volatile sig_atomic_t flag = 1;
 static void signalHandler(int sig) {
     if (sig == SIGINT || sig == SIGTERM) {
         flag = 0;
+        ros::requestShutdown();
     }
 }
 
