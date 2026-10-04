@@ -9,11 +9,11 @@
 | 有界队列满了怎么办？ | `core/bounded_queue.h` | 实时感知选择 DropOldest，保证采集有界延迟并暴露 dropped 指标；离线任务可选 Block |
 | 条件变量为什么必须带谓词？ | `BoundedQueue::push/pop` | 防止虚假唤醒，并把 shutdown 纳入唤醒条件；关闭时 `notify_all` 解除所有等待者 |
 | 线程怎么优雅退出？ | `PipelineStage::stop`、`PipelineController::stop` | atomic 运行标志 + queue shutdown + join；控制器按下游到上游顺序停止，避免生产者卡在已停止消费者前 |
-| 构造尚未完成就销毁对象怎么办？ | `LslidarChDriver::~LslidarChDriver`、`tests/test_driver_lifecycle.cpp` | DIFOP 线程尚未创建时不能解引用空指针；已创建时还要判断 `joinable()`。本测试只覆盖未初始化实例的析构，不证明活动线程的退出时限 |
+| 构造尚未完成或线程仍在运行时怎样销毁对象？ | `LslidarChDriver::~LslidarChDriver`、`Input::requestStop()`、`tests/test_driver_lifecycle.cpp` | DIFOP 线程尚未创建时不能解引用空指针；已创建时先置原子停止标志，让 socket/PCAP 读取循环有界返回，再判断 `joinable()` 并 `join()`。回环 UDP 测试覆盖活动线程析构，但不等同于进程收到信号后的退出测试 |
 | 什么是数据竞争？ | `PipelineStage::metrics_mutex_` | 处理线程写指标、ROS 定时器读指标，必须在同一互斥量下获取快照，不能靠普通结构体“碰巧可用” |
 | PCAP 回放要检查什么？ | `InputPCAP::getPacket` | 检查截断帧长度、一次回放 EOF 语义、过滤器结果，并避免 `abort()` 破坏正常退出 |
 | 点云帧怎样保留来源？ | `StampedPointCloud` 与增强驱动各 Stage | 传递字符串坐标系 ID 与递增帧序号；Marker/PointCloud2 使用输入帧 ID，不把输出写死为 `laser_link` |
 
 ## 验证边界
 
-独立主机 Debug/Release 测试覆盖队列的丢旧保新、阻塞唤醒、关闭与复用，均 1/1 通过且设置 5 秒超时。[GitHub ROS Noetic/Focal CI](https://github.com/Vikebt/EmbeddedLinux_3DLiDAR_Perception/actions/runs/37170717363) 已完成完整 catkin 构建，汇总 20 个测试、0 错误、0 失败、0 跳过。新增析构测试先在[修复前的运行](https://github.com/Vikebt/EmbeddedLinux_3DLiDAR_Perception/actions/runs/37170494180)中复现段错误，再在修复后通过；ROS 测试流程为需 `NodeHandle` 的用例启动 master，并设置 180 秒运行上限。完整构建还帮助发现并修复消息生成依赖竞态、性能统计头文件的声明顺序问题。上述证据不等同于 ROS 节点运行、活动 DIFOP 线程的退出时限、LS1550 与 Jetson 吞吐、丢包率或温度功耗验证。
+独立主机 Debug/Release 测试覆盖队列的丢旧保新、阻塞唤醒、关闭与复用，均 1/1 通过且设置 5 秒超时。[GitHub ROS Noetic/Focal CI](https://github.com/Vikebt/EmbeddedLinux_3DLiDAR_Perception/actions/runs/37171823584) 已完成完整 catkin 构建，汇总 22 个测试、0 错误、0 失败、0 跳过。其中未初始化析构先在[修复前的运行](https://github.com/Vikebt/EmbeddedLinux_3DLiDAR_Perception/actions/runs/37170494180)中复现段错误；活动 DIFOP 线程析构测试在[取消逻辑修复前](https://github.com/Vikebt/EmbeddedLinux_3DLiDAR_Perception/actions/runs/37171490308)超出 6 秒并失败，修复后用回环 UDP 激活线程，析构测试约 3.3 秒通过，且保持全局 `ros::ok()`。ROS 测试流程为需 `NodeHandle` 的用例启动 master，并设置 180 秒运行上限。完整构建还帮助发现并修复消息生成依赖竞态、性能统计头文件的声明顺序问题。上述证据不等同于 ROS 节点在 SIGINT/SIGTERM 下的进程级退出测试，也不证明 LS1550 与 Jetson 吞吐、丢包率或温度功耗。
