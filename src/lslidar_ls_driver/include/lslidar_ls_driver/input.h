@@ -44,6 +44,7 @@
 #include <fcntl.h>
 #include <sys/file.h>
 #include <csignal>
+#include <atomic>
 #include <cstring>
 #include <cerrno>
 #include <sensor_msgs/TimeReference.h>
@@ -71,6 +72,8 @@ namespace lslidar_ch_driver {
 
         virtual int getPacket(lslidar_ls_driver::LslidarLsPacketPtr &packet) = 0;
 
+        void requestStop() noexcept { stop_requested_.store(true); }
+
         int getRpm(void);
 
         int getReturnMode(void);
@@ -80,6 +83,8 @@ namespace lslidar_ch_driver {
         void clearUpdateFlag(void);
 
     protected:
+        bool stopRequested() const noexcept { return stop_requested_.load(); }
+        std::atomic<bool> stop_requested_{false};
         ros::NodeHandle private_nh_;
         uint16_t port_;
         std::string devip_str_;

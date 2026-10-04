@@ -62,10 +62,17 @@ namespace lslidar_ch_driver {
     }
 
     LslidarChDriver::~LslidarChDriver() {
+        requestStop();
         if (difop_thread_ && difop_thread_->joinable()) {
             difop_thread_->join();
         }
         (void) close(socket_id);
+    }
+
+    void LslidarChDriver::requestStop() noexcept {
+        stop_requested_.store(true);
+        if (msop_input_) msop_input_->requestStop();
+        if (difop_input_) difop_input_->requestStop();
     }
 
     bool LslidarChDriver::loadParameters() {
@@ -151,9 +158,10 @@ namespace lslidar_ch_driver {
     void LslidarChDriver::difopPoll() {
         lslidar_ls_driver::LslidarLsPacketPtr difop_packet(new lslidar_ls_driver::LslidarLsPacket());
         // reading and publishing scans as fast as possible.
-        while (ros::ok()) {
+        while (ros::ok() && !stop_requested_.load()) {
             // keep reading
             int rc = difop_input_->getPacket(difop_packet);
+            if (stop_requested_.load()) return;
             if (rc == 0) {
                 if (difop_packet->data[0] == 0x00 || difop_packet->data[0] == 0xa5) {
                     if (difop_packet->data[1] == 0xff && difop_packet->data[2] == 0x00 &&
@@ -300,12 +308,13 @@ namespace lslidar_ch_driver {
 
         // Since the lslidar delivers data at a very high rate, keep
         // reading and publishing scans as fast as possible.
-        while (true) {
+        while (ros::ok() && !stop_requested_.load()) {
             // keep reading until full packet received
             int rc = msop_input_->getPacket(packet);
             if (rc == 0) break;       // got a full packet?
             if (rc < 0) return false; // end of file reached?
         }
+        if (!ros::ok() || stop_requested_.load()) return false;
 
         // publish message using time of last packet read
         if (use_time_service) {
@@ -542,13 +551,14 @@ namespace lslidar_ch_driver {
     bool LslidarChDriver::getLidarInformation(){
         lslidar_ls_driver::LslidarLsPacketPtr msg(new lslidar_ls_driver::LslidarLsPacket());
     
-        while (true) {
+        while (ros::ok() && !stop_requested_.load()) {
             // keep reading until full packet received
             int rc_ = msop_input_->getPacket(msg);
 
             if (rc_ == 0) break;       // got a full packet?
             if (rc_ < 0) return false; // end of file reached?
         }
+        if (!ros::ok() || stop_requested_.load()) return false;
         
         if(get_ms06_param && m_horizontal_point != 0 && msg->data[1204] == 192){
             //ms06  param
