@@ -224,14 +224,16 @@ public:
         std::fprintf(stderr, "[EnhancedInit] Base initialize returned\n");
         std::fprintf(stderr, "[EnhancedInit] Before pipeline stages\n");
         setupPipeline();
-        ROS_INFO("[EnhancedInit] Pipeline stages ready");
+        std::fprintf(stderr, "[EnhancedInit] Pipeline stages ready\n");
         createPublishers();
-        ROS_INFO("[EnhancedInit] Publishers ready");
+        std::fprintf(stderr, "[EnhancedInit] Publishers ready\n");
         resource_monitor_.start();
-        ROS_INFO("[EnhancedInit] Resource monitor ready");
+        std::fprintf(stderr, "[EnhancedInit] Resource monitor ready\n");
         platform::ProfilerManager::instance().setMaxSamples(10000);
+        std::fprintf(stderr, "[EnhancedInit] Profiler ready\n");
         diag_timer_ = nh_.createTimer(ros::Duration(10.0),
             &EnhancedLslidarDriver::diagnosticCallback, this);
+        std::fprintf(stderr, "[EnhancedInit] Diagnostics timer ready\n");
 
         ROS_INFO("===== Enhanced LiDAR Driver Initialized =====");
         ROS_INFO("Pipeline: Filter -> Perception -> Visualize");
