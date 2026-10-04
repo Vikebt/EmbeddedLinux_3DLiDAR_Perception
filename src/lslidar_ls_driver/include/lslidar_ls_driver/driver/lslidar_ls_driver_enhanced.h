@@ -222,7 +222,7 @@ public:
             return false;
         }
         std::fprintf(stderr, "[EnhancedInit] Base initialize returned\n");
-        ROS_INFO("[EnhancedInit] Base driver ready");
+        std::fprintf(stderr, "[EnhancedInit] Before pipeline stages\n");
         setupPipeline();
         ROS_INFO("[EnhancedInit] Pipeline stages ready");
         createPublishers();
