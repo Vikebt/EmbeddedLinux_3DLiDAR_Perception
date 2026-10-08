@@ -18,31 +18,58 @@
 
 #include <lslidar_ls_driver/lslidar_ls_driver.h>
 
+#include <atomic>
+#include <chrono>
+#include <thread>
+
 volatile sig_atomic_t flag = 1;
 
 static void my_handler(int sig) {
-    flag = 0;
-    exit(0);
+    if (sig == SIGINT || sig == SIGTERM) {
+        flag = 0;
+    }
 }
 
 int main(int argc, char **argv) {
-    ros::init(argc, argv, "lslidar_ls_driver_node");
+    ros::init(argc, argv, "lslidar_ls_driver_node",
+              ros::init_options::NoSigintHandler);
     ros::NodeHandle node;
     ros::NodeHandle private_nh("~");
+    private_nh.setParam("ready", false);
 
     signal(SIGINT, my_handler);
+    signal(SIGTERM, my_handler);
+
+    std::atomic<bool> stop_watcher{false};
+    std::thread shutdown_watcher([&stop_watcher] {
+        while (!stop_watcher.load() && flag && ros::ok()) {
+            std::this_thread::sleep_for(std::chrono::milliseconds(20));
+        }
+        if (!flag) {
+            ros::shutdown();
+        }
+    });
 
     // start the driver
     ROS_INFO("namespace is %s", private_nh.getNamespace().c_str());
     lslidar_ch_driver::LslidarChDriver driver(node, private_nh);
     if (!driver.initialize()) {
-        ROS_ERROR("Cannot initialize lslidar driver...");
-        return 0;
+        const int exit_code = flag ? 1 : 0;
+        if (flag) {
+            ROS_ERROR("Cannot initialize lslidar driver...");
+        }
+        stop_watcher.store(true);
+        shutdown_watcher.join();
+        return exit_code;
     }
+    private_nh.setParam("ready", true);
     // loop until shut down or end of file
-    while (ros::ok() && driver.polling()) {
+    while (ros::ok() && flag && driver.polling()) {
         ros::spinOnce();
     }
-    sleep(2);
+    private_nh.setParam("ready", false);
+    ros::shutdown();
+    stop_watcher.store(true);
+    shutdown_watcher.join();
     return 0;
 }

@@ -85,7 +85,7 @@ namespace lslidar_ch_driver {
         ROS_INFO_STREAM("Opening UDP socket port: " << port);
         sockfd_ = socket(PF_INET, SOCK_DGRAM, 0);
         if (sockfd_ == -1) {
-            perror("socket");  // TODO: ROS_ERROR errno
+            ROS_ERROR("socket() failed for UDP port %u: %s", port, strerror(errno));
             return;
         }
         int opt = 1;
@@ -102,7 +102,7 @@ namespace lslidar_ch_driver {
         my_addr.sin_addr.s_addr = htonl(INADDR_ANY);  // automatically fill in my IP
 
         if (bind(sockfd_, (sockaddr *) &my_addr, sizeof(sockaddr)) == -1) {
-            perror("bind");  // TODO: ROS_ERROR errno
+            ROS_ERROR("bind() failed for UDP port %u: %s", port, strerror(errno));
             close(sockfd_);
             sockfd_ = -1;
             return;
