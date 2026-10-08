@@ -55,6 +55,7 @@
 #include <chrono>
 #include <sstream>
 #include <csignal>
+#include <thread>
 
 using namespace lslidar_ch_driver::algorithm;
 
@@ -211,9 +212,11 @@ void pointCloudCallback(const sensor_msgs::PointCloud2::ConstPtr& msg) {
 //   7. 收到Ctrl+C → 退出
 // ============================================================================
 int main(int argc, char** argv) {
-    ros::init(argc, argv, "lslidar_ls_pipeline_node");
+    ros::init(argc, argv, "lslidar_ls_pipeline_node",
+              ros::init_options::NoSigintHandler);
     ros::NodeHandle nh;
     ros::NodeHandle pnh("~");
+    pnh.setParam("ready", false);
 
     signal(SIGINT, signalHandler);
     signal(SIGTERM, signalHandler);
@@ -254,11 +257,15 @@ int main(int argc, char** argv) {
     g_fps_stats.last_time = std::chrono::steady_clock::now();
 
     ROS_INFO("Pipeline node started. Subscribing to: %s", input_topic.c_str());
+    pnh.setParam("ready", true);
 
-    // ros::spin() 是ROS的事件循环，阻塞在这里等待话题消息
-    // 收到消息 → 调用回调函数 → 处理完成 → 继续等待
-    ros::spin();
+    while (ros::ok() && g_running) {
+        ros::spinOnce();
+        std::this_thread::sleep_for(std::chrono::milliseconds(10));
+    }
 
+    pnh.setParam("ready", false);
+    ros::shutdown();
     ROS_INFO("Pipeline node shutdown.");
     return 0;
 }

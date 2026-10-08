@@ -1,0 +1,50 @@
+name: ROS Noetic integration
+
+on:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  catkin:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    container:
+      image: rostooling/setup-ros-docker:ubuntu-focal-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install ROS build dependencies
+        run: |
+          apt-get update
+          apt-get install -y --no-install-recommends \
+            ros-noetic-ros-base \
+            ros-noetic-pcl-ros \
+            ros-noetic-pcl-conversions \
+            ros-noetic-nodelet \
+            ros-noetic-dynamic-reconfigure \
+            ros-noetic-diagnostic-updater \
+            ros-noetic-visualization-msgs \
+            ros-noetic-rostest \
+            libpcap-dev
+      - name: Build complete catkin package
+        shell: bash
+        run: |
+          source /opt/ros/noetic/setup.bash
+          catkin_make -DCMAKE_BUILD_TYPE=Release -j2
+      - name: Run catkin regression tests
+        shell: bash
+        run: |
+          source /opt/ros/noetic/setup.bash
+          roscore >/tmp/lslidar-roscore.log 2>&1 &
+          roscore_pid=$!
+          trap 'kill "$roscore_pid" 2>/dev/null || true' EXIT
+          for attempt in $(seq 1 50); do
+            if rosparam list >/dev/null 2>&1; then break; fi
+            sleep 0.2
+          done
+          rosparam list >/dev/null
+          timeout 180 catkin_make run_tests -j2
+          catkin_test_results --verbose
+          python3 src/lslidar_ls_driver/tests/test_node_signal_exit.py \
+            devel/lib/lslidar_ls_driver/lslidar_ls_driver_node \
+            devel/lib/lslidar_ls_driver/lslidar_ls_driver_enhanced_node \
+            devel/lib/lslidar_ls_driver/lslidar_ls_pipeline_node

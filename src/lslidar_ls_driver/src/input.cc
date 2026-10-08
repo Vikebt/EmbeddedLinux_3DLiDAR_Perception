@@ -19,6 +19,10 @@
 
 #include "lslidar_ls_driver/input.h"
 
+#include <algorithm>
+#include <chrono>
+#include <thread>
+
 extern volatile sig_atomic_t flag;
 namespace lslidar_ch_driver {
     static const size_t packet_size = sizeof(lslidar_ls_driver::LslidarLsPacket().data);
@@ -81,7 +85,7 @@ namespace lslidar_ch_driver {
         ROS_INFO_STREAM("Opening UDP socket port: " << port);
         sockfd_ = socket(PF_INET, SOCK_DGRAM, 0);
         if (sockfd_ == -1) {
-            perror("socket");  // TODO: ROS_ERROR errno
+            ROS_ERROR("socket() failed for UDP port %u: %s", port, strerror(errno));
             return;
         }
         int opt = 1;
@@ -98,7 +102,7 @@ namespace lslidar_ch_driver {
         my_addr.sin_addr.s_addr = htonl(INADDR_ANY);  // automatically fill in my IP
 
         if (bind(sockfd_, (sockaddr *) &my_addr, sizeof(sockaddr)) == -1) {
-            perror("bind");  // TODO: ROS_ERROR errno
+            ROS_ERROR("bind() failed for UDP port %u: %s", port, strerror(errno));
             close(sockfd_);
             sockfd_ = -1;
             return;
@@ -156,9 +160,10 @@ namespace lslidar_ch_driver {
     }
 
     int InputSocket::getPacket(lslidar_ls_driver::LslidarLsPacketPtr &packet) {
-        if (efd_ < 0 || sockfd_ < 0) return -1;
+        if (stopRequested() || efd_ < 0 || sockfd_ < 0) return -1;
         struct epoll_event events[1];
         int nfds = epoll_wait(efd_, events, 1, 3000);
+        if (stopRequested()) return -1;
         
         if (nfds <= 0) {
           if (nfds == 0) {
@@ -235,7 +240,7 @@ namespace lslidar_ch_driver {
         struct pcap_pkthdr *header;
         const u_char *pkt_data;
         static int count_frame= 0;
-        while (flag == 1) {
+        while (flag == 1 && !stopRequested()) {
             int res;
             if ((res = pcap_next_ex(pcap_, &header, &pkt_data)) >= 0) {
 //                ROS_INFO("read pcap file count = %d",count_frame);
@@ -284,7 +289,16 @@ namespace lslidar_ch_driver {
             }
             if (repeat_delay_ > 0.0) {
                 ROS_INFO("end of file reached -- delaying %.3f seconds.", repeat_delay_);
-                usleep(rint(repeat_delay_ * 1000000.0));
+                const auto deadline = std::chrono::steady_clock::now() +
+                    std::chrono::duration<double>(repeat_delay_);
+                while (!stopRequested() && std::chrono::steady_clock::now() < deadline) {
+                    const std::chrono::duration<double> remaining =
+                        deadline - std::chrono::steady_clock::now();
+                    std::this_thread::sleep_for(std::min(
+                        remaining,
+                        std::chrono::duration<double>(0.1)));
+                }
+                if (stopRequested()) return -1;
             }
             ROS_DEBUG("replaying lslidar dump file");
             pcap_close(pcap_);

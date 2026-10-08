@@ -7,7 +7,9 @@ project(lslidar_ls_driver)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 add_compile_options(-Wall -Wextra -Wno-unused-parameter)
-set(CMAKE_BUILD_TYPE Release)
+if(NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
+    set(CMAKE_BUILD_TYPE Release CACHE STRING "Build type" FORCE)
+endif()
 
 message("cmake_build_type: " ${CMAKE_BUILD_TYPE})
 
@@ -135,9 +137,10 @@ add_dependencies(lslidar_ls_pipeline_node
 # ===========================================================================
 # 依赖链接（确保input库正确依赖消息生成）
 # ===========================================================================
-if (catkin_EXPORTED_TARGETS)
-    add_dependencies(lslidar_ls_input ${catkin_EXPORTED_TARGETS})
-endif()
+add_dependencies(lslidar_ls_input
+    ${${PROJECT_NAME}_EXPORTED_TARGETS}
+    ${catkin_EXPORTED_TARGETS}
+)
 
 # ===========================================================================
 # 单元测试 (需要catkin中启用测试)
@@ -149,15 +152,20 @@ if(CATKIN_ENABLE_TESTING)
     catkin_add_gtest(test_filter tests/test_filter.cpp)
     catkin_add_gtest(test_ground_seg tests/test_ground_seg.cpp)
     catkin_add_gtest(test_clustering tests/test_clustering.cpp)
+    catkin_add_gtest(test_driver_lifecycle tests/test_driver_lifecycle.cpp)
     foreach(test_target test_pipeline test_filter test_ground_seg test_clustering)
         if(TARGET ${test_target})
             target_link_libraries(${test_target} ${catkin_LIBRARIES})
         endif()
     endforeach()
+    if(TARGET test_driver_lifecycle)
+        target_link_libraries(test_driver_lifecycle lslidar_ls_driver ${catkin_LIBRARIES})
+    endif()
 
     add_executable(test_bounded_queue tests/host/test_bounded_queue.cpp)
     target_link_libraries(test_bounded_queue pthread)
     add_test(NAME bounded_queue COMMAND test_bounded_queue)
+    set_tests_properties(bounded_queue PROPERTIES TIMEOUT 5)
 endif()
 
 # ===========================================================================

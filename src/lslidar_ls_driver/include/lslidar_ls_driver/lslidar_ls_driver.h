@@ -46,6 +46,7 @@
 #include <fcntl.h>
 #include <sys/file.h>
 #include <chrono>
+#include <atomic>
 #include <lslidar_ls_driver/LslidarLsPacket.h>
 #include <lslidar_ls_driver/angle_distortion_correction.h>
 #include <lslidar_ls_driver/frame_rate.h>
@@ -104,6 +105,8 @@ namespace lslidar_ch_driver {
         LslidarChDriver(ros::NodeHandle &n, ros::NodeHandle &pn);
 
         ~LslidarChDriver();
+
+        void requestStop() noexcept;
 
         bool initialize();
 
@@ -186,6 +189,7 @@ namespace lslidar_ch_driver {
 
         // Converter convtor_
         std::shared_ptr<std::thread> difop_thread_;
+        std::atomic<bool> stop_requested_{false};
 
         // Ethernet relate variables
         std::string lidar_ip_string;
